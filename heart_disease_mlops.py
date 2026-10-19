@@ -1,31 +1,34 @@
-from pathlib import Path
 import io
-import zipfile
 import urllib.request
+import zipfile
+from pathlib import Path
 
 import joblib
-import mlflow
-import numpy as np
-import pandas as pd
 import matplotlib
+import mlflow
+import pandas as pd
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score,
-    f1_score, roc_auc_score, classification_report,
-    confusion_matrix,
-)
-from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -65,8 +68,7 @@ def prepare_data():
     with urllib.request.urlopen(request, timeout=60) as response:
         content = response.read()
 
-    with zipfile.ZipFile(io.BytesIO(content)) as archive:
-        with archive.open("processed.cleveland.data") as source:
+    with zipfile.ZipFile(io.BytesIO(content)) as archive, archive.open("processed.cleveland.data") as source:
             df = pd.read_csv(
                 source, header=None, names=COLUMNS, na_values="?"
             )
