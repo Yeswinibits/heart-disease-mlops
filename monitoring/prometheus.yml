@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: heart-disease-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["heart-disease-api.default.svc.cluster.local:8000"]
