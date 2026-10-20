@@ -1,4 +1,8 @@
 import io
+import logging
+import time
+from collections import Counter
+from threading import Lock
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -11,7 +15,8 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
 from sklearn.ensemble import RandomForestClassifier
@@ -202,6 +207,54 @@ app = FastAPI(
     description="Educational demonstration only; not for clinical use.",
     version="1.0.0",
 )
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("heart_disease_api")
+_metrics_lock = Lock()
+_request_counts = Counter()
+_request_duration_seconds = Counter()
+
+
+@app.middleware("http")
+async def collect_request_metrics(request: Request, call_next):
+    start = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        elapsed = time.perf_counter() - start
+        method = request.method
+        path = request.url.path
+        with _metrics_lock:
+            _request_counts[(method, path, status_code)] += 1
+            _request_duration_seconds[(method, path)] += elapsed
+        logger.info(
+            "method=%s path=%s status=%s duration_seconds=%.6f",
+            method, path, status_code, elapsed,
+        )
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics():
+    lines = [
+        "# HELP api_requests_total Total API requests by method, path and status.",
+        "# TYPE api_requests_total counter",
+        "# HELP api_request_duration_seconds_total Total request duration in seconds.",
+        "# TYPE api_request_duration_seconds_total counter",
+    ]
+    with _metrics_lock:
+        for (method, path, status), count in sorted(_request_counts.items()):
+            lines.append(
+                f'api_requests_total{{method="{method}",path="{path}",status="{status}"}} {count}'
+            )
+        for (method, path), duration in sorted(_request_duration_seconds.items()):
+            lines.append(
+                f'api_request_duration_seconds_total{{method="{method}",path="{path}"}} {duration:.6f}'
+            )
+    return "\n".join(lines) + "\n"
 
 class HeartDiseaseInput(BaseModel):
     age: float = Field(ge=1, le=120)
