@@ -1,11 +1,11 @@
 import io
 import logging
 import time
-from collections import Counter
-from threading import Lock
 import urllib.request
 import zipfile
+from collections import Counter
 from pathlib import Path
+from threading import Lock
 
 import joblib
 import matplotlib
